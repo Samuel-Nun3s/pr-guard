@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { DiffParser } from '../github/diff.parser';
 
 export interface FormattedComment {
   path: string;
@@ -6,16 +7,27 @@ export interface FormattedComment {
   body: string;
 }
 
+type Severity = 'error' | 'warning' | 'suggestion';
+
+const SEVERITY_LABEL: Record<Severity, string> = {
+  error: '🔴 ERROR',
+  warning: '🟡 WARNING',
+  suggestion: '🔵 SUGGESTION',
+};
+
 @Injectable()
 export class CommentFormatter {
+  constructor(private readonly diffParser: DiffParser) {}
+
   format(
     filename: string,
-    comments: Array<{ line: number; severity: 'error' | 'warning' | 'suggestion'; body: string }>,
+    comments: Array<{ line: number; severity: Severity; body: string }>,
+    addedLines: Set<number>,
   ): FormattedComment[] {
     return comments.map((c) => ({
       path: filename,
-      line: c.line,
-      body: `**[${c.severity.toUpperCase()}]** ${c.body}`,
+      line: this.diffParser.clampToValidLine(c.line, addedLines),
+      body: `**[${SEVERITY_LABEL[c.severity]}]** ${c.body}`,
     }));
   }
 }
