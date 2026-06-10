@@ -81,6 +81,7 @@ export default function SettingsPage() {
             Provedor
             <select name="provider" defaultValue={llmConfig?.provider ?? 'anthropic'} style={inputStyle}>
               <option value="anthropic">Anthropic</option>
+              <option value="openai">OpenAI</option>
             </select>
           </label>
           <label style={labelStyle}>
