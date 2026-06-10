@@ -1,18 +1,65 @@
-import { Controller, Get, Put, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, HttpCode } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CryptoService } from '../llm/crypto.service';
 
 @Controller('config')
 export class ConfigController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly crypto: CryptoService,
+  ) {}
+
+  // ── LLM Config ────────────────────────────────────────────────────────────
 
   @Get('llm')
-  getLlmConfig() {
-    return this.prisma.llmConfig.findFirst();
+  async getLlmConfig() {
+    const config = await this.prisma.llmConfig.findFirst();
+    if (!config) return null;
+    // Never expose the raw encrypted key — return only a masked hint
+    return { ...config, encryptedKey: undefined, keyHint: '••••••••' };
   }
 
+  @Post('llm')
+  @HttpCode(200)
+  async saveLlmConfig(
+    @Body() body: { provider: string; model: string; apiKey: string },
+  ) {
+    const encryptedKey = this.crypto.encrypt(body.apiKey);
+    const existing = await this.prisma.llmConfig.findFirst();
+
+    if (existing) {
+      return this.prisma.llmConfig.update({
+        where: { id: existing.id },
+        data: { provider: body.provider, model: body.model, encryptedKey },
+        select: { id: true, provider: true, model: true, updatedAt: true },
+      });
+    }
+
+    return this.prisma.llmConfig.create({
+      data: { provider: body.provider, model: body.model, encryptedKey },
+      select: { id: true, provider: true, model: true, updatedAt: true },
+    });
+  }
+
+  // ── Knowledge Packs ────────────────────────────────────────────────────────
+
   @Get('packs')
-  getPacks() {
-    return this.prisma.knowledgePack.findMany();
+  getAllPacks() {
+    return this.prisma.knowledgePack.findMany({ orderBy: { slug: 'asc' } });
+  }
+
+  @Get('repos/:repoId/packs')
+  async getRepoPacks(@Param('repoId') repositoryId: string) {
+    const [packs, repoPacks] = await Promise.all([
+      this.prisma.knowledgePack.findMany({ orderBy: { slug: 'asc' } }),
+      this.prisma.repoKnowledgePack.findMany({ where: { repositoryId } }),
+    ]);
+
+    const enabledSet = new Set(
+      repoPacks.filter((rp) => rp.enabled).map((rp) => rp.packId),
+    );
+
+    return packs.map((pack) => ({ ...pack, enabled: enabledSet.has(pack.id) }));
   }
 
   @Put('repos/:repoId/packs/:packId')
@@ -26,5 +73,25 @@ export class ConfigController {
       update: { enabled },
       create: { repositoryId, packId, enabled },
     });
+  }
+
+  // ── Model Pricing ─────────────────────────────────────────────────────────
+
+  @Get('pricing')
+  getPricing() {
+    return this.prisma.modelPricing.findMany({ orderBy: [{ provider: 'asc' }, { model: 'asc' }] });
+  }
+
+  @Put('pricing/:id')
+  updatePricing(
+    @Param('id') id: string,
+    @Body() body: {
+      inputPerMTok: number;
+      outputPerMTok: number;
+      cacheReadPerMTok: number;
+      cacheWritePerMTok: number;
+    },
+  ) {
+    return this.prisma.modelPricing.update({ where: { id }, data: body });
   }
 }

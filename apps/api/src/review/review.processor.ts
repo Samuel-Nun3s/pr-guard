@@ -9,7 +9,8 @@ import { PrReviewConfigParser } from '../knowledge/pr-review-config.parser';
 import { CryptoService } from '../llm/crypto.service';
 import { CostCalculator } from '../llm/cost.calculator';
 import { AnthropicProvider } from '../llm/anthropic.provider';
-import { TokenUsage } from '../llm/llm-provider.interface';
+import { OpenAiProvider } from '../llm/openai.provider';
+import { LlmProvider, TokenUsage } from '../llm/llm-provider.interface';
 import { ReviewAgent } from './review.agent';
 import { CommentFormatter } from './comment.formatter';
 import { EventsPublisher } from './events.publisher';
@@ -40,6 +41,11 @@ export class ReviewProcessor {
     private readonly formatter: CommentFormatter,
     private readonly events: EventsPublisher,
   ) {}
+
+  private createProvider(providerName: string, model: string, apiKey: string): LlmProvider {
+    if (providerName === 'openai') return new OpenAiProvider(apiKey, model);
+    return new AnthropicProvider(apiKey, model);
+  }
 
   @Process()
   async handle(job: Job<PrReviewJob>) {
@@ -73,7 +79,7 @@ export class ReviewProcessor {
 
       const packs = await this.knowledge.getActivePacksText(repositoryId);
       const apiKey = this.crypto.decrypt(llmConfig.encryptedKey);
-      const provider = new AnthropicProvider(apiKey, llmConfig.model);
+      const provider = this.createProvider(llmConfig.provider, llmConfig.model, apiKey);
 
       const pricing = await this.prisma.modelPricing.findUnique({
         where: { provider_model: { provider: llmConfig.provider, model: llmConfig.model } },

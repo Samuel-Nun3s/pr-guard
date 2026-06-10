@@ -1,36 +1,51 @@
-import { Controller, Get, Param, Res, Sse } from '@nestjs/common';
-import { Response } from 'express';
-import { Observable, Subject } from 'rxjs';
+import { Controller, Get, Param, Sse } from '@nestjs/common';
+import { Observable, merge, from } from 'rxjs';
+import { map, concatMap } from 'rxjs/operators';
 import { PrismaService } from '../prisma/prisma.service';
+import { EventBus } from '../review/event.bus';
 
 @Controller('runs')
 export class RunsController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventBus: EventBus,
+  ) {}
 
   @Get()
   findAll() {
-    return this.prisma.reviewRun.findMany({ orderBy: { createdAt: 'desc' }, take: 50 });
+    return this.prisma.reviewRun.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: { repository: { select: { owner: true, name: true } } },
+    });
   }
 
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.prisma.reviewRun.findUniqueOrThrow({
       where: { id },
-      include: { comments: true, events: true },
+      include: {
+        repository: { select: { owner: true, name: true } },
+        comments: true,
+        events: { orderBy: { createdAt: 'asc' } },
+      },
     });
   }
 
   @Sse(':id/events')
   events(@Param('id') id: string): Observable<MessageEvent> {
-    const subject = new Subject<MessageEvent>();
+    // Emit all historical events first, then stream live events until completed/failed
+    const historical$ = from(
+      this.prisma.reviewEvent.findMany({
+        where: { runId: id },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ).pipe(concatMap((events) => from(events)));
 
-    this.prisma.reviewEvent
-      .findMany({ where: { runId: id }, orderBy: { createdAt: 'asc' } })
-      .then((events) => {
-        events.forEach((e) => subject.next({ data: e } as MessageEvent));
-        subject.complete();
-      });
+    const live$ = this.eventBus.getOrCreate(id).asObservable();
 
-    return subject.asObservable();
+    return merge(historical$, live$).pipe(
+      map((event) => ({ data: event } as MessageEvent)),
+    );
   }
 }

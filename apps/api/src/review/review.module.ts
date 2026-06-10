@@ -4,6 +4,7 @@ import { ReviewProcessor } from './review.processor';
 import { ReviewAgent } from './review.agent';
 import { CommentFormatter } from './comment.formatter';
 import { EventsPublisher } from './events.publisher';
+import { EventBus } from './event.bus';
 import { GithubModule } from '../github/github.module';
 import { LlmModule } from '../llm/llm.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
@@ -16,7 +17,7 @@ import { PR_REVIEW_QUEUE } from '../queue/queue.module';
     LlmModule,
     KnowledgeModule,
   ],
-  providers: [ReviewProcessor, ReviewAgent, CommentFormatter, EventsPublisher],
-  // PrReviewConfigParser is exported by KnowledgeModule
+  providers: [EventBus, EventsPublisher, ReviewProcessor, ReviewAgent, CommentFormatter],
+  exports: [EventBus],
 })
 export class ReviewModule {}
