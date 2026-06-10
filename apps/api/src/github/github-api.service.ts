@@ -72,6 +72,27 @@ export class GithubApiService {
     this.logger.log(`Posted ${comments.length} comments on ${owner}/${repo}#${pullNumber}`);
   }
 
+  async getFileContent(
+    owner: string,
+    repo: string,
+    filePath: string,
+    installationId: number,
+  ): Promise<string | null> {
+    const octokit = await this.getInstallationOctokit(installationId);
+    try {
+      const { data } = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+        owner,
+        repo,
+        path: filePath,
+      });
+      if (Array.isArray(data) || data.type !== 'file') return null;
+      return Buffer.from(data.content, 'base64').toString('utf-8');
+    } catch (err: unknown) {
+      if ((err as { status?: number }).status === 404) return null;
+      throw err;
+    }
+  }
+
   async getHeadCommitSha(
     owner: string,
     repo: string,

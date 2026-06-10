@@ -17,5 +17,6 @@ import { PR_REVIEW_QUEUE } from '../queue/queue.module';
     KnowledgeModule,
   ],
   providers: [ReviewProcessor, ReviewAgent, CommentFormatter, EventsPublisher],
+  // PrReviewConfigParser is exported by KnowledgeModule
 })
 export class ReviewModule {}

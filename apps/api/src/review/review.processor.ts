@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GithubApiService } from '../github/github-api.service';
 import { DiffParser } from '../github/diff.parser';
 import { KnowledgeService } from '../knowledge/knowledge.service';
+import { PrReviewConfigParser } from '../knowledge/pr-review-config.parser';
 import { CryptoService } from '../llm/crypto.service';
 import { CostCalculator } from '../llm/cost.calculator';
 import { AnthropicProvider } from '../llm/anthropic.provider';
@@ -32,6 +33,7 @@ export class ReviewProcessor {
     private readonly github: GithubApiService,
     private readonly diffParser: DiffParser,
     private readonly knowledge: KnowledgeService,
+    private readonly configParser: PrReviewConfigParser,
     private readonly crypto: CryptoService,
     private readonly costCalculator: CostCalculator,
     private readonly agent: ReviewAgent,
@@ -48,15 +50,25 @@ export class ReviewProcessor {
     await this.events.publish(runId, 'queued');
 
     try {
-      const [commitSha, files, llmConfig] = await Promise.all([
+      const [commitSha, files, llmConfig, prReviewRaw] = await Promise.all([
         this.github.getHeadCommitSha(owner, repo, pullNumber, installationId),
         this.github.getPullRequestFiles(owner, repo, pullNumber, installationId),
         this.prisma.llmConfig.findFirst(),
+        this.github.getFileContent(owner, repo, '.prreview.json', installationId),
       ]);
 
       if (!llmConfig) throw new Error('No LLM config found. Add one via Settings.');
 
-      const diffs = this.diffParser.parse(files);
+      const prReviewConfig = this.configParser.parse(prReviewRaw);
+
+      const allDiffs = this.diffParser.parse(files);
+      const diffs = allDiffs.filter(
+        (d) => !this.configParser.shouldIgnoreFile(d.filename, prReviewConfig.ignoreFiles),
+      );
+
+      this.logger.log(
+        `${diffs.length}/${allDiffs.length} files to review after ignore filter`,
+      );
       await this.events.publish(runId, 'diff_loaded', { fileCount: diffs.length });
 
       const packs = await this.knowledge.getActivePacksText(repositoryId);
@@ -86,13 +98,17 @@ export class ReviewProcessor {
         totalUsage.cacheReadTokens += fileReview.usage.cacheReadTokens;
         totalUsage.cacheCreationTokens += fileReview.usage.cacheCreationTokens;
 
+        const eligibleComments = fileReview.comments.filter((c) =>
+          this.configParser.meetsSeverityThreshold(c.severity, prReviewConfig.minSeverity),
+        );
+
         if (fileReview.summary) summaries.push(`**${diff.filename}:** ${fileReview.summary}`);
 
-        const formatted = this.formatter.format(diff.filename, fileReview.comments, diff.addedLines);
+        const formatted = this.formatter.format(diff.filename, eligibleComments, diff.addedLines);
         allFormattedComments.push(...formatted);
 
         await this.prisma.reviewComment.createMany({
-          data: fileReview.comments.map((c) => ({
+          data: eligibleComments.map((c) => ({
             runId,
             path: diff.filename,
             line: c.line,
@@ -128,7 +144,7 @@ export class ReviewProcessor {
       });
 
       await this.events.publish(runId, 'completed', { costCents, totalComments: allFormattedComments.length });
-      this.logger.log(`Completed review run ${runId} — ${allFormattedComments.length} comments, $${(costCents / 100).toFixed(4)}`);
+      this.logger.log(`Completed run ${runId} — ${allFormattedComments.length} comments, $${(costCents / 100).toFixed(4)}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error(`Review run ${runId} failed: ${message}`);
