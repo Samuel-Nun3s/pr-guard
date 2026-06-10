@@ -1,29 +1,89 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { App } from '@octokit/app';
+import { FormattedComment } from '../review/comment.formatter';
 
-export interface ReviewComment {
-  path: string;
-  line: number;
-  severity: 'error' | 'warning' | 'suggestion';
-  body: string;
+export interface PullRequestFile {
+  filename: string;
+  patch?: string;
+  additions: number;
+  deletions: number;
+  status: string;
 }
 
 @Injectable()
 export class GithubApiService {
-  constructor(private readonly config: ConfigService) {}
+  private readonly logger = new Logger(GithubApiService.name);
+  private readonly app: App;
 
-  // Phase 1: fetch PR diff files via Octokit
-  async getPullRequestFiles(_owner: string, _repo: string, _pullNumber: number) {
-    throw new Error('Not implemented — Phase 1');
+  constructor(private readonly config: ConfigService) {
+    this.app = new App({
+      appId: this.config.getOrThrow<string>('GITHUB_APP_ID'),
+      privateKey: this.config.getOrThrow<string>('GITHUB_APP_PRIVATE_KEY'),
+      webhooks: { secret: this.config.getOrThrow<string>('GITHUB_WEBHOOK_SECRET') },
+    });
   }
 
-  // Phase 2: post inline review comments
+  private async getInstallationOctokit(installationId: number) {
+    return this.app.getInstallationOctokit(installationId);
+  }
+
+  async getPullRequestFiles(
+    owner: string,
+    repo: string,
+    pullNumber: number,
+    installationId: number,
+  ): Promise<PullRequestFile[]> {
+    const octokit = await this.getInstallationOctokit(installationId);
+    const { data } = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}/files', {
+      owner,
+      repo,
+      pull_number: pullNumber,
+      per_page: 100,
+    });
+    return data as PullRequestFile[];
+  }
+
   async postReviewComments(
-    _owner: string,
-    _repo: string,
-    _pullNumber: number,
-    _comments: ReviewComment[],
-  ) {
-    throw new Error('Not implemented — Phase 2');
+    owner: string,
+    repo: string,
+    pullNumber: number,
+    installationId: number,
+    comments: FormattedComment[],
+    summary: string,
+    commitSha: string,
+  ): Promise<void> {
+    const octokit = await this.getInstallationOctokit(installationId);
+
+    await octokit.request('POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews', {
+      owner,
+      repo,
+      pull_number: pullNumber,
+      commit_id: commitSha,
+      event: 'COMMENT',
+      body: summary,
+      comments: comments.map((c) => ({
+        path: c.path,
+        line: c.line,
+        body: c.body,
+      })),
+    });
+
+    this.logger.log(`Posted ${comments.length} comments on ${owner}/${repo}#${pullNumber}`);
+  }
+
+  async getHeadCommitSha(
+    owner: string,
+    repo: string,
+    pullNumber: number,
+    installationId: number,
+  ): Promise<string> {
+    const octokit = await this.getInstallationOctokit(installationId);
+    const { data } = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
+      owner,
+      repo,
+      pull_number: pullNumber,
+    });
+    return data.head.sha;
   }
 }
