@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pr-guard
+          POSTGRES_PASSWORD: pr-guard
+          POSTGRES_DB: pr-guard-test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://pr-guard:pr-guard@localhost:5432/pr-guard-test
+      REDIS_URL: redis://localhost:6379
+      ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+      GITHUB_WEBHOOK_SECRET: test-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+        working-directory: apps/api
+
+      - name: Lint (api)
+        run: npm run lint --workspace=apps/api
+        continue-on-error: true
+
+      - name: Lint (web)
+        run: npm run lint --workspace=apps/web
+        continue-on-error: true
+
+      - name: Build (shared)
+        run: npm run build --workspace=packages/shared
+
+      - name: Build (api)
+        run: npm run build --workspace=apps/api
+
+      - name: Build (web)
+        run: npm run build --workspace=apps/web
+
+      - name: Test (api)
+        run: npm run test --workspace=apps/api
+
+      - name: Test (web)
+        run: npm run test --workspace=apps/web

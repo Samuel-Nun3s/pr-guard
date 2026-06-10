@@ -1,0 +1,17 @@
+{
+  "name": "pr-guard",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "lint": "npm run lint --workspaces",
+    "test": "npm run test --workspaces",
+    "dev": "npm run dev --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

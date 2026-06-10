@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Repository {
+  id             String              @id @default(cuid())
+  owner          String
+  name           String
+  installationId Int                 @unique
+  active         Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  runs           ReviewRun[]
+  packs          RepoKnowledgePack[]
+
+  @@unique([owner, name])
+}
+
+model LlmConfig {
+  id           String   @id @default(cuid())
+  provider     String   @default("anthropic")
+  model        String   @default("claude-opus-4-8")
+  encryptedKey String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model KnowledgePack {
+  id          String              @id @default(cuid())
+  slug        String              @unique
+  title       String
+  description String
+  filePath    String
+  createdAt   DateTime            @default(now())
+
+  repos       RepoKnowledgePack[]
+}
+
+model RepoKnowledgePack {
+  repositoryId String
+  packId       String
+  enabled      Boolean    @default(false)
+
+  repository   Repository    @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  pack         KnowledgePack @relation(fields: [packId], references: [id], onDelete: Cascade)
+
+  @@id([repositoryId, packId])
+}
+
+model ReviewRun {
+  id                  String        @id @default(cuid())
+  repositoryId        String
+  prNumber            Int
+  prTitle             String        @default("")
+  status              ReviewStatus  @default(PENDING)
+  model               String        @default("")
+  inputTokens         Int           @default(0)
+  outputTokens        Int           @default(0)
+  cacheReadTokens     Int           @default(0)
+  cacheCreationTokens Int           @default(0)
+  costCents           Int           @default(0)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  repository          Repository    @relation(fields: [repositoryId], references: [id])
+  events              ReviewEvent[]
+  comments            ReviewComment[]
+}
+
+enum ReviewStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model ReviewEvent {
+  id        String   @id @default(cuid())
+  runId     String
+  step      String
+  payload   Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  run       ReviewRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+}
+
+model ReviewComment {
+  id       String @id @default(cuid())
+  runId    String
+  path     String
+  line     Int
+  severity String
+  body     String
+
+  run      ReviewRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+}
+
+model ModelPricing {
+  id               String   @id @default(cuid())
+  provider         String
+  model            String
+  inputPerMTok     Float
+  outputPerMTok    Float
+  cacheReadPerMTok Float
+  cacheWritePerMTok Float
+  updatedAt        DateTime @updatedAt
+
+  @@unique([provider, model])
+}
