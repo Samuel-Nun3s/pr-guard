@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Put, Body, Param, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, HttpCode, UseGuards } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../llm/crypto.service';
+import { AuthGuard } from '../auth/auth.guard';
 
+@UseGuards(AuthGuard)
 @Controller('config')
 export class ConfigController {
   constructor(
@@ -15,29 +17,29 @@ export class ConfigController {
   async getLlmConfig() {
     const config = await this.prisma.llmConfig.findFirst();
     if (!config) return null;
-    // Never expose the raw encrypted key — return only a masked hint
     return { ...config, encryptedKey: undefined, keyHint: '••••••••' };
   }
 
   @Post('llm')
   @HttpCode(200)
   async saveLlmConfig(
-    @Body() body: { provider: string; model: string; apiKey: string },
+    @Body() body: { provider: string; model: string; apiKey: string; baseUrl?: string },
   ) {
     const encryptedKey = this.crypto.encrypt(body.apiKey);
+    const baseUrl = body.baseUrl?.trim() || null;
     const existing = await this.prisma.llmConfig.findFirst();
 
     if (existing) {
       return this.prisma.llmConfig.update({
         where: { id: existing.id },
-        data: { provider: body.provider, model: body.model, encryptedKey },
-        select: { id: true, provider: true, model: true, updatedAt: true },
+        data: { provider: body.provider, model: body.model, encryptedKey, baseUrl },
+        select: { id: true, provider: true, model: true, baseUrl: true, updatedAt: true },
       });
     }
 
     return this.prisma.llmConfig.create({
-      data: { provider: body.provider, model: body.model, encryptedKey },
-      select: { id: true, provider: true, model: true, updatedAt: true },
+      data: { provider: body.provider, model: body.model, encryptedKey, baseUrl },
+      select: { id: true, provider: true, model: true, baseUrl: true, updatedAt: true },
     });
   }
 

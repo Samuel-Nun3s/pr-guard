@@ -1,32 +1,60 @@
 const BASE = '/api';
 
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`);
+const TOKEN_KEY = 'pr_guard_token';
+
+export const auth = {
+  getToken: () => localStorage.getItem(TOKEN_KEY),
+  setToken: (t: string) => localStorage.setItem(TOKEN_KEY, t),
+  clearToken: () => localStorage.removeItem(TOKEN_KEY),
+  isLoggedIn: () => !!localStorage.getItem(TOKEN_KEY),
+};
+
+function authHeaders(): Record<string, string> {
+  const token = auth.getToken();
+  return token
+    ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+    : { 'Content-Type': 'application/json' };
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    ...init,
+    headers: { ...authHeaders(), ...(init.headers ?? {}) },
+  });
+  if (res.status === 401) {
+    auth.clearToken();
+    window.location.href = '/login';
+    throw new Error('Unauthorized');
+  }
   if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
   return res.json() as Promise<T>;
+}
+
+async function get<T>(path: string): Promise<T> {
+  return request<T>(path);
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
-  return res.json() as Promise<T>;
+  return request<T>(path, { method: 'POST', body: JSON.stringify(body) });
 }
 
 async function put<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
-  return res.json() as Promise<T>;
+  return request<T>(path, { method: 'PUT', body: JSON.stringify(body) });
 }
 
 export const api = {
+  auth: {
+    login: (email: string, password: string) =>
+      fetch(`${BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      }).then(async (res) => {
+        if (!res.ok) throw new Error('Invalid credentials');
+        const data = (await res.json()) as { token: string };
+        return data.token;
+      }),
+  },
   repos: {
     list: () => get<RepoWithStats[]>('/repos'),
     runs: (repoId: string) => get<Run[]>(`/repos/${repoId}/runs`),
@@ -47,7 +75,7 @@ export const api = {
   config: {
     llm: {
       get: () => get<LlmConfigResponse | null>('/config/llm'),
-      save: (body: { provider: string; model: string; apiKey: string }) =>
+      save: (body: { provider: string; model: string; apiKey: string; baseUrl?: string }) =>
         post<LlmConfigResponse>('/config/llm', body),
     },
     packs: {
@@ -119,6 +147,7 @@ export interface LlmConfigResponse {
   id: string;
   provider: string;
   model: string;
+  baseUrl: string | null;
   keyHint: string;
   updatedAt: string;
 }

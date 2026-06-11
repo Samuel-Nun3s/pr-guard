@@ -1,9 +1,11 @@
-import { Controller, Get, Param, Sse } from '@nestjs/common';
+import { Controller, Get, Param, Sse, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '../auth/auth.guard';
 import { Observable, merge, from } from 'rxjs';
 import { map, concatMap } from 'rxjs/operators';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventBus } from '../review/event.bus';
 
+@UseGuards(AuthGuard)
 @Controller('runs')
 export class RunsController {
   constructor(

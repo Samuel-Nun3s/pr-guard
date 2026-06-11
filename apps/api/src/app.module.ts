@@ -7,6 +7,7 @@ import { LlmModule } from './llm/llm.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { QueueModule } from './queue/queue.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { QueueModule } from './queue/queue.module';
     LlmModule,
     KnowledgeModule,
     ReviewModule,
+    AuthModule,
     DashboardModule,
   ],
 })

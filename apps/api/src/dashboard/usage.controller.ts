@@ -1,5 +1,6 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthGuard } from '../auth/auth.guard';
 
 type GroupBy = 'day' | 'repo' | 'model';
 
@@ -14,6 +15,7 @@ interface RunRecord {
   createdAt: Date;
 }
 
+@UseGuards(AuthGuard)
 @Controller('usage')
 export class UsageController {
   constructor(private readonly prisma: PrismaService) {}

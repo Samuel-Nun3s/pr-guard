@@ -11,10 +11,15 @@ interface OpenAiResponse {
 }
 
 export class OpenAiProvider implements LlmProvider {
+  private readonly baseUrl: string;
+
   constructor(
     private readonly apiKey: string,
     private readonly model: string,
-  ) {}
+    baseUrl?: string,
+  ) {
+    this.baseUrl = (baseUrl ?? 'https://api.openai.com/v1').replace(/\/$/, '');
+  }
 
   async reviewFile(filename: string, diff: string, packs: string): Promise<FileReview> {
     const systemText = packs
@@ -38,7 +43,7 @@ export class OpenAiProvider implements LlmProvider {
       temperature: 0.1,
     };
 
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,

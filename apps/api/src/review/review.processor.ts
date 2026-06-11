@@ -42,9 +42,9 @@ export class ReviewProcessor {
     private readonly events: EventsPublisher,
   ) {}
 
-  private createProvider(providerName: string, model: string, apiKey: string): LlmProvider {
-    if (providerName === 'openai') return new OpenAiProvider(apiKey, model);
-    return new AnthropicProvider(apiKey, model);
+  private createProvider(providerName: string, model: string, apiKey: string, baseUrl?: string | null): LlmProvider {
+    if (providerName === 'anthropic') return new AnthropicProvider(apiKey, model);
+    return new OpenAiProvider(apiKey, model, baseUrl ?? undefined);
   }
 
   @Process()
@@ -79,7 +79,7 @@ export class ReviewProcessor {
 
       const packs = await this.knowledge.getActivePacksText(repositoryId);
       const apiKey = this.crypto.decrypt(llmConfig.encryptedKey);
-      const provider = this.createProvider(llmConfig.provider, llmConfig.model, apiKey);
+      const provider = this.createProvider(llmConfig.provider, llmConfig.model, apiKey, llmConfig.baseUrl);
 
       const pricing = await this.prisma.modelPricing.findUnique({
         where: { provider_model: { provider: llmConfig.provider, model: llmConfig.model } },

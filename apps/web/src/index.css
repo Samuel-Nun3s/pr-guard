@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #f0f4ff;
+  --color-brand-100: #e0eaff;
+  --color-brand-500: #4f6ef7;
+  --color-brand-600: #3b5bf5;
+  --color-brand-700: #2946e8;
+}
+
+button, [role="button"], label[for], summary {
+  cursor: pointer;
+}

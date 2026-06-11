@@ -18,16 +18,17 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.51.0",
+    "@nestjs/bull": "^10.2.3",
     "@nestjs/common": "^10.4.15",
+    "@nestjs/config": "^3.3.0",
     "@nestjs/core": "^10.4.15",
     "@nestjs/platform-express": "^10.4.15",
-    "@nestjs/config": "^3.3.0",
-    "@nestjs/bull": "^10.2.3",
-    "bull": "^4.16.5",
+    "@octokit/app": "^14.0.0",
+    "@octokit/rest": "^20.1.1",
     "@prisma/client": "^6.9.0",
-    "@anthropic-ai/sdk": "^0.51.0",
-    "@octokit/app": "^15.1.1",
-    "@octokit/rest": "^21.1.1",
+    "bull": "^4.16.5",
+    "jsonwebtoken": "^9.0.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   },
@@ -35,9 +36,10 @@
     "@nestjs/cli": "^10.4.9",
     "@nestjs/schematics": "^10.2.3",
     "@nestjs/testing": "^10.4.15",
-    "@types/jest": "^29.5.14",
-    "@types/node": "^22.15.30",
     "@types/express": "^5.0.1",
+    "@types/jest": "^29.5.14",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.15.30",
     "@typescript-eslint/eslint-plugin": "^8.33.0",
     "@typescript-eslint/parser": "^8.33.0",
     "eslint": "^9.28.0",
@@ -48,13 +50,19 @@
     "typescript": "^5.8.3"
   },
   "jest": {
-    "moduleFileExtensions": ["js", "json", "ts"],
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
-    "collectCoverageFrom": ["**/*.(t|j)s"],
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
   }

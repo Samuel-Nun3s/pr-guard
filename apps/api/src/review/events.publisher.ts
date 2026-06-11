@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventBus } from './event.bus';
 
@@ -20,7 +21,7 @@ export class EventsPublisher {
 
   async publish(runId: string, step: PipelineStep, payload?: Record<string, unknown>) {
     const event = await this.prisma.reviewEvent.create({
-      data: { runId, step, payload: payload ?? {} },
+      data: { runId, step, payload: (payload ?? {}) as Prisma.InputJsonValue },
     });
 
     this.eventBus.emit(runId, event);
