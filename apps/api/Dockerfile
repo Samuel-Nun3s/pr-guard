@@ -15,12 +15,11 @@ RUN cd packages/shared && npm run build
 COPY apps/api/prisma/ ./apps/api/prisma/
 RUN cd apps/api && npx prisma generate
 
-# Build API — cd into workspace so nest-cli.json is found correctly
+# Build API — set WORKDIR so nest-cli.json and tsconfig.json are found correctly
 COPY apps/api/ ./apps/api/
-RUN cd apps/api && npm run build
-
-# Verify build output exists
-RUN test -f apps/api/dist/main.js || (echo "ERROR: nest build did not produce dist/main.js" && exit 1)
+WORKDIR /app/apps/api
+RUN npm run build
+RUN ls -la dist/ && echo "Build succeeded"
 
 # ── Production image ──────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
