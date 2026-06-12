@@ -76,14 +76,17 @@ export class WebhookController {
       },
     });
 
-    await this.reviewQueue.add({
-      repositoryId: repository.id,
-      runId: run.id,
-      owner,
-      repo: repoName,
-      pullNumber: prNumber,
-      installationId,
-    });
+    await this.reviewQueue.add(
+      {
+        repositoryId: repository.id,
+        runId: run.id,
+        owner,
+        repo: repoName,
+        pullNumber: prNumber,
+        installationId,
+      },
+      { attempts: 3, backoff: { type: 'exponential', delay: 30_000 } },
+    );
 
     this.logger.log(`Enqueued review run ${run.id} for ${owner}/${repoName}#${prNumber}`);
     return { ok: true, runId: run.id };
