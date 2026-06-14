@@ -24,10 +24,13 @@ model Repository {
 
 model LlmConfig {
   id           String   @id @default(cuid())
+  label        String   @default("")
   provider     String   @default("anthropic")
   model        String   @default("claude-opus-4-8")
   baseUrl      String?
+  reviewMode   String   @default("comment")
   encryptedKey String
+  active       Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }

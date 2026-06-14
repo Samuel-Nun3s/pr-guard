@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { api, RunDetail } from '../lib/api';
+import { api, auth, RunDetail } from '../lib/api';
 import PipelineView from '../features/pipeline/PipelineView';
 
 const SEVERITY_STYLES = {
@@ -32,22 +32,32 @@ export default function RunDetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    api.runs.get(id).then((r) => { setRun(r); setLoading(false); });
+    api.runs.get(id).then((r) => {
+      setRun(r);
+      setEvents(r.events ?? []);
+      setLoading(false);
+    });
   }, [id]);
 
   useEffect(() => {
-    if (!id) return;
-    const es = new EventSource(`/api/runs/${id}/events`);
+    if (!id || !run) return;
+    if (run.status === 'COMPLETED' || run.status === 'FAILED') return;
+
+    const token = auth.getToken() ?? '';
+    const es = new EventSource(`/api/runs/${id}/events?token=${encodeURIComponent(token)}`);
     es.onmessage = (e) => {
       const event = JSON.parse(e.data) as { step: string; payload: Record<string, unknown> };
-      setEvents((prev) => [...prev, event]);
+      setEvents((prev) => {
+        const alreadyHas = prev.some((p) => p.step === event.step && JSON.stringify(p.payload) === JSON.stringify(event.payload));
+        return alreadyHas ? prev : [...prev, event];
+      });
       if (event.step === 'completed' || event.step === 'failed') {
         es.close();
         api.runs.get(id).then(setRun);
       }
     };
     return () => es.close();
-  }, [id]);
+  }, [id, run?.status]);
 
   if (loading) return <PageSkeleton />;
   if (!run) return <p className="text-gray-500">Run not found.</p>;
