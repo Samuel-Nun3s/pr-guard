@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsageController } from '../usage.controller';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuthGuard } from '../../auth/auth.guard';
 
 function makeRun(overrides: Partial<{
   repositoryId: string;
@@ -36,7 +37,10 @@ describe('UsageController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsageController],
       providers: [{ provide: PrismaService, useValue: mockPrisma }],
-    }).compile();
+    })
+      .overrideGuard(AuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<UsageController>(UsageController);
   });
