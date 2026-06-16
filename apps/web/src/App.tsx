@@ -1,5 +1,6 @@
 import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
 import ReposPage from './pages/ReposPage';
+import RepoRunsPage from './pages/RepoRunsPage';
 import RunDetailPage from './pages/RunDetailPage';
 import UsagePage from './pages/UsagePage';
 import SettingsPage from './pages/SettingsPage';
@@ -63,6 +64,7 @@ function Shell() {
       <main className="flex-1 overflow-y-auto p-8">
         <Routes>
           <Route path="/" element={<ReposPage />} />
+          <Route path="/repos/:id/runs" element={<RepoRunsPage />} />
           <Route path="/runs/:id" element={<RunDetailPage />} />
           <Route path="/usage" element={<UsagePage />} />
           <Route path="/settings" element={<SettingsPage />} />

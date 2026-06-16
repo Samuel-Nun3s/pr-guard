@@ -44,14 +44,17 @@ function RepoCard({ repo }: { repo: RepoWithStats }) {
   const status = run?.status ?? null;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 flex items-center justify-between gap-4 hover:shadow-sm transition-shadow">
+    <Link
+      to={`/repos/${repo.id}/runs`}
+      className="bg-white border border-gray-200 rounded-xl p-5 flex items-center justify-between gap-4 hover:shadow-sm hover:border-gray-300 transition-all"
+    >
       <div className="flex flex-col gap-1 min-w-0">
         <span className="font-semibold text-gray-900 truncate">
           {repo.owner}/<span className="text-blue-600">{repo.name}</span>
         </span>
         {run ? (
           <span className="text-xs text-gray-400">
-            Last run: {new Date(run.createdAt).toLocaleString()}
+            Last PR: #{run.prNumber} · {run.prTitle} · {new Date(run.createdAt).toLocaleString()}
           </span>
         ) : (
           <span className="text-xs text-gray-400">No runs yet</span>
@@ -64,16 +67,11 @@ function RepoCard({ repo }: { repo: RepoWithStats }) {
             {status}
           </span>
         )}
-        {run && (
-          <Link
-            to={`/runs/${run.id}`}
-            className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
-          >
-            View run →
-          </Link>
-        )}
+        <svg className="w-4 h-4 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
       </div>
-    </div>
+    </Link>
   );
 }
 
