@@ -9,9 +9,11 @@ export class AuthGuard implements CanActivate {
   canActivate(ctx: ExecutionContext): boolean {
     const req = ctx.switchToHttp().getRequest<Request>();
     const header = req.headers.authorization;
-    if (!header?.startsWith('Bearer ')) throw new UnauthorizedException();
-    const token = header.slice(7);
-    if (!this.auth.verify(token)) throw new UnauthorizedException();
+    // EventSource (SSE) cannot send headers — accept token via query param as fallback
+    const token = header?.startsWith('Bearer ')
+      ? header.slice(7)
+      : (req.query['token'] as string | undefined);
+    if (!token || !this.auth.verify(token)) throw new UnauthorizedException();
     return true;
   }
 }

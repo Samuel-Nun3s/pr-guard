@@ -5,9 +5,18 @@ const prisma = new PrismaClient();
 async function main() {
   // Model pricing seed (user-editable via Settings)
   const pricingData = [
-    { provider: 'anthropic', model: 'claude-opus-4-8',   inputPerMTok: 5.00, outputPerMTok: 25.00, cacheReadPerMTok: 0.50, cacheWritePerMTok: 6.25 },
-    { provider: 'anthropic', model: 'claude-sonnet-4-6', inputPerMTok: 3.00, outputPerMTok: 15.00, cacheReadPerMTok: 0.30, cacheWritePerMTok: 3.75 },
-    { provider: 'anthropic', model: 'claude-haiku-4-5',  inputPerMTok: 1.00, outputPerMTok: 5.00,  cacheReadPerMTok: 0.10, cacheWritePerMTok: 1.25 },
+    // Anthropic
+    { provider: 'anthropic', model: 'claude-opus-4-8',   inputPerMTok: 5.00,  outputPerMTok: 25.00, cacheReadPerMTok: 0.50, cacheWritePerMTok: 6.25 },
+    { provider: 'anthropic', model: 'claude-sonnet-4-6', inputPerMTok: 3.00,  outputPerMTok: 15.00, cacheReadPerMTok: 0.30, cacheWritePerMTok: 3.75 },
+    { provider: 'anthropic', model: 'claude-haiku-4-5',  inputPerMTok: 1.00,  outputPerMTok: 5.00,  cacheReadPerMTok: 0.10, cacheWritePerMTok: 1.25 },
+    // OpenAI
+    { provider: 'openai', model: 'gpt-4.1',       inputPerMTok: 2.00,  outputPerMTok: 8.00,  cacheReadPerMTok: 0.50, cacheWritePerMTok: 0 },
+    { provider: 'openai', model: 'gpt-4.1-mini',  inputPerMTok: 0.40,  outputPerMTok: 1.60,  cacheReadPerMTok: 0.10, cacheWritePerMTok: 0 },
+    { provider: 'openai', model: 'gpt-4.1-nano',  inputPerMTok: 0.10,  outputPerMTok: 0.40,  cacheReadPerMTok: 0.025, cacheWritePerMTok: 0 },
+    { provider: 'openai', model: 'gpt-4o',        inputPerMTok: 2.50,  outputPerMTok: 10.00, cacheReadPerMTok: 1.25, cacheWritePerMTok: 0 },
+    { provider: 'openai', model: 'gpt-4o-mini',   inputPerMTok: 0.15,  outputPerMTok: 0.60,  cacheReadPerMTok: 0.075, cacheWritePerMTok: 0 },
+    { provider: 'openai', model: 'o3',            inputPerMTok: 10.00, outputPerMTok: 40.00, cacheReadPerMTok: 2.50, cacheWritePerMTok: 0 },
+    { provider: 'openai', model: 'o4-mini',       inputPerMTok: 1.10,  outputPerMTok: 4.40,  cacheReadPerMTok: 0.275, cacheWritePerMTok: 0 },
   ];
 
   for (const p of pricingData) {
