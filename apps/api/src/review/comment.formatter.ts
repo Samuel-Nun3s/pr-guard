@@ -10,9 +10,9 @@ export interface FormattedComment {
 type Severity = 'error' | 'warning' | 'suggestion';
 
 const SEVERITY_LABEL: Record<Severity, string> = {
-  error: '🔴 ERROR',
-  warning: '🟡 WARNING',
-  suggestion: '🔵 SUGGESTION',
+  error: '🔴 Error',
+  warning: '🟡 Warning',
+  suggestion: '🔵 Suggestion',
 };
 
 @Injectable()
