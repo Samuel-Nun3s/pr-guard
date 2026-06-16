@@ -35,13 +35,23 @@ export class GithubApiService {
     installationId: number,
   ): Promise<PullRequestFile[]> {
     const octokit = await this.getInstallationOctokit(installationId);
-    const { data } = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}/files', {
-      owner,
-      repo,
-      pull_number: pullNumber,
-      per_page: 100,
-    });
-    return data as PullRequestFile[];
+    const files: PullRequestFile[] = [];
+    let page = 1;
+
+    while (true) {
+      const { data } = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}/files', {
+        owner,
+        repo,
+        pull_number: pullNumber,
+        per_page: 100,
+        page,
+      });
+      files.push(...(data as PullRequestFile[]));
+      if (data.length < 100) break;
+      page++;
+    }
+
+    return files;
   }
 
   async postReviewComments(
