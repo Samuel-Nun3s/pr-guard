@@ -80,7 +80,7 @@ export default function RunDetailPage() {
             </span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Review Run</h1>
-          <p className="text-sm text-gray-400 mt-1">{new Date(run.createdAt).toLocaleString()}</p>
+          <p className="text-sm text-gray-400 mt-1">{new Date(run.createdAt).toLocaleString('pt-BR')}</p>
         </div>
         <span className={`text-sm font-medium px-3 py-1 rounded-full shrink-0 ${STATUS_STYLES[run.status] ?? 'bg-gray-100 text-gray-600'}`}>
           {run.status}

@@ -72,7 +72,7 @@ function RunRow({ run }: { run: Run }) {
           <span className="font-medium text-gray-900 truncate">{run.prTitle}</span>
         </div>
         <span className="text-xs text-gray-400 mt-0.5 block">
-          {new Date(run.createdAt).toLocaleString()}
+          {new Date(run.createdAt).toLocaleString('pt-BR')}
         </span>
       </div>
 

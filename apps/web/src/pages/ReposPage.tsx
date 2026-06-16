@@ -54,7 +54,7 @@ function RepoCard({ repo }: { repo: RepoWithStats }) {
         </span>
         {run ? (
           <span className="text-xs text-gray-400">
-            Last PR: #{run.prNumber} · {run.prTitle} · {new Date(run.createdAt).toLocaleString()}
+            Last PR: #{run.prNumber} · {run.prTitle} · {new Date(run.createdAt).toLocaleString('pt-BR')}
           </span>
         ) : (
           <span className="text-xs text-gray-400">No runs yet</span>
