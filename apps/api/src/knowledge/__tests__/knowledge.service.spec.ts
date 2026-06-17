@@ -4,7 +4,9 @@ import { PromptBuilder } from '../prompt.builder';
 import { PrismaService } from '../../prisma/prisma.service';
 
 // Mock the fs module — no real files touched in unit tests
+// existsSync is needed by Prisma client at module-load time
 jest.mock('fs', () => ({
+  existsSync: jest.fn().mockReturnValue(true),
   promises: {
     readFile: jest.fn(),
   },

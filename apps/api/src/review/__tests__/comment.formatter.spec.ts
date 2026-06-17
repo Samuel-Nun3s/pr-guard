@@ -9,18 +9,18 @@ describe('CommentFormatter', () => {
 
   it('formats an error comment with the correct label', () => {
     const result = formatter.format('src/auth.ts', [{ line: 5, severity: 'error', body: 'SQL injection risk' }], addedLines);
-    expect(result[0].body).toContain('🔴 ERROR');
+    expect(result[0].body).toContain('🔴 Error');
     expect(result[0].body).toContain('SQL injection risk');
   });
 
   it('formats a warning comment', () => {
     const result = formatter.format('src/auth.ts', [{ line: 5, severity: 'warning', body: 'Use const' }], addedLines);
-    expect(result[0].body).toContain('🟡 WARNING');
+    expect(result[0].body).toContain('🟡 Warning');
   });
 
   it('formats a suggestion comment', () => {
     const result = formatter.format('src/auth.ts', [{ line: 5, severity: 'suggestion', body: 'Extract method' }], addedLines);
-    expect(result[0].body).toContain('🔵 SUGGESTION');
+    expect(result[0].body).toContain('🔵 Suggestion');
   });
 
   it('sets the correct file path', () => {

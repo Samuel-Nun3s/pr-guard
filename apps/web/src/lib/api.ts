@@ -57,6 +57,8 @@ export const api = {
   },
   repos: {
     list: () => get<RepoWithStats[]>('/repos'),
+    update: (id: string, body: { reviewMode: string }) =>
+      request<RepoWithStats>(`/repos/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     runs: (repoId: string) => get<Run[]>(`/repos/${repoId}/runs`),
   },
   runs: {
@@ -74,9 +76,13 @@ export const api = {
   },
   config: {
     llm: {
-      get: () => get<LlmConfigResponse | null>('/config/llm'),
-      save: (body: { provider: string; model: string; apiKey: string; baseUrl?: string }) =>
+      list: () => get<LlmConfigResponse[]>('/config/llm'),
+      create: (body: { label?: string; provider: string; model: string; apiKey: string; baseUrl?: string }) =>
         post<LlmConfigResponse>('/config/llm', body),
+      update: (id: string, body: { label?: string; provider?: string; model?: string; apiKey?: string; baseUrl?: string }) =>
+        put<LlmConfigResponse>(`/config/llm/${id}`, body),
+      activate: (id: string) => put<LlmConfigResponse>(`/config/llm/${id}/activate`, {}),
+      delete: (id: string) => request<{ ok: boolean }>(`/config/llm/${id}`, { method: 'DELETE' }),
     },
     packs: {
       all: () => get<KnowledgePack[]>('/config/packs'),
@@ -99,6 +105,7 @@ export interface RepoWithStats {
   owner: string;
   name: string;
   active: boolean;
+  reviewMode: string;
   createdAt: string;
   latestRun: { id: string; status: string; prNumber: number; prTitle: string; createdAt: string } | null;
 }
@@ -145,10 +152,13 @@ export interface UsageResponse {
 
 export interface LlmConfigResponse {
   id: string;
+  label: string;
   provider: string;
   model: string;
   baseUrl: string | null;
+  active: boolean;
   keyHint: string;
+  createdAt: string;
   updatedAt: string;
 }
 

@@ -23,8 +23,8 @@ export class OpenAiProvider implements LlmProvider {
 
   async reviewFile(filename: string, diff: string, packs: string): Promise<FileReview> {
     const systemText = packs
-      ? `You are a senior code reviewer.\n\n${packs}`
-      : 'You are a senior code reviewer.';
+      ? `You are a senior code reviewer. Be concise: each comment body must be 1–2 sentences max. Flag only real issues — skip style nitpicks unless they cause bugs.\n\n${packs}`
+      : 'You are a senior code reviewer. Be concise: each comment body must be 1–2 sentences max. Flag only real issues — skip style nitpicks unless they cause bugs.';
 
     const body = {
       model: this.model,

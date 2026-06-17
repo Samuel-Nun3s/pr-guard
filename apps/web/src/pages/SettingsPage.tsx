@@ -1,4 +1,4 @@
-import { useEffect, useState, FormEvent } from 'react';
+import { useEffect, useState, useRef, FormEvent } from 'react';
 import { api, LlmConfigResponse, ModelPricing, RepoWithStats, KnowledgePackWithEnabled } from '../lib/api';
 
 const PRESET_PROVIDERS = [
@@ -26,35 +26,134 @@ const PRESET_PROVIDERS = [
 
 const OTHER_VALUE = '__other__';
 
+// ── New-config form (inline) ───────────────────────────────────────────────
+
+function NewConfigForm({
+  pricing,
+  onCreated,
+  onCancel,
+}: {
+  pricing: ModelPricing[];
+  onCreated: (cfg: LlmConfigResponse) => void;
+  onCancel: () => void;
+}) {
+  const [selectedProvider, setSelectedProvider] = useState('anthropic');
+  const [customProvider, setCustomProvider] = useState('');
+  const [baseUrl, setBaseUrl] = useState('');
+  const [model, setModel] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSaving(true);
+    const form = new FormData(e.currentTarget);
+    const resolvedProvider = selectedProvider === OTHER_VALUE ? customProvider.trim() : selectedProvider;
+    try {
+      const created = await api.config.llm.create({
+        label:    (form.get('label') as string).trim(),
+        provider: resolvedProvider,
+        model:    model.trim() || (form.get('model') as string),
+        apiKey:   form.get('apiKey') as string,
+        baseUrl:  baseUrl.trim() || undefined,
+      });
+      onCreated(created);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const modelOptions = (selectedProvider === OTHER_VALUE
+    ? pricing
+    : pricing.filter((p) => p.provider === selectedProvider)
+  ).map((p) => p.model);
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4 pt-4 border-t border-gray-100 mt-2">
+      <Field label="Label (optional)">
+        <input name="label" placeholder="e.g. OpenAI Production, Anthropic Test…" className={inputCls} />
+      </Field>
+
+      <Field label="Provider">
+        <div className="grid grid-cols-3 gap-3">
+          {PRESET_PROVIDERS.map((p) => (
+            <button key={p.value} type="button"
+              onClick={() => { setSelectedProvider(p.value); setModel(''); }}
+              className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${selectedProvider === p.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+            >
+              <span className={selectedProvider === p.value ? 'text-blue-600' : 'text-gray-400'}>{p.logo}</span>
+              <div>
+                <p className={`text-sm font-semibold ${selectedProvider === p.value ? 'text-blue-700' : 'text-gray-700'}`}>{p.label}</p>
+                <p className="text-xs text-gray-400">{p.description}</p>
+              </div>
+              {selectedProvider === p.value && <span className="ml-auto w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs shrink-0">✓</span>}
+            </button>
+          ))}
+          <button type="button"
+            onClick={() => { setSelectedProvider(OTHER_VALUE); setModel(''); }}
+            className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${selectedProvider === OTHER_VALUE ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+          >
+            <span className={`text-xl ${selectedProvider === OTHER_VALUE ? 'text-blue-600' : 'text-gray-400'}`}>⚙️</span>
+            <div>
+              <p className={`text-sm font-semibold ${selectedProvider === OTHER_VALUE ? 'text-blue-700' : 'text-gray-700'}`}>Other</p>
+              <p className="text-xs text-gray-400">OpenAI-compatible</p>
+            </div>
+            {selectedProvider === OTHER_VALUE && <span className="ml-auto w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs shrink-0">✓</span>}
+          </button>
+        </div>
+
+        {selectedProvider === OTHER_VALUE && (
+          <div className="mt-3 flex flex-col gap-3 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+            <p className="text-xs text-gray-500">Any OpenAI-compatible API — Groq, Mistral, Together AI, Ollama, etc.</p>
+            <Field label="Provider name">
+              <input value={customProvider} onChange={(e) => setCustomProvider(e.target.value)} placeholder="groq, mistral, ollama…" className={inputCls} />
+            </Field>
+            <Field label="Base URL">
+              <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.groq.com/openai/v1" className={inputCls} />
+            </Field>
+          </div>
+        )}
+      </Field>
+
+      <Field label="Model">
+        <ModelCombobox value={model} onChange={setModel} placeholder="e.g. claude-opus-4-8" options={modelOptions} />
+      </Field>
+
+      <Field label="API Key">
+        <input name="apiKey" type="password" placeholder="sk-ant-…" required className={inputCls} />
+      </Field>
+
+      <div className="flex items-center gap-3">
+        <button type="submit" disabled={saving}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors">
+          {saving ? 'Saving…' : 'Save configuration'}
+        </button>
+        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ── Main page ──────────────────────────────────────────────────────────────
+
 export default function SettingsPage() {
-  const [selectedProvider, setSelectedProvider] = useState<string>('anthropic');
-  const [customProvider,   setCustomProvider]   = useState<string>('');
-  const [baseUrl,          setBaseUrl]          = useState<string>('');
-  const [llmConfig,    setLlmConfig]    = useState<LlmConfigResponse | null>(null);
+  const [llmConfigs,   setLlmConfigs]   = useState<LlmConfigResponse[]>([]);
+  const [showNewForm,  setShowNewForm]  = useState(false);
   const [pricing,      setPricing]      = useState<ModelPricing[]>([]);
   const [repos,        setRepos]        = useState<RepoWithStats[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<string>('');
   const [packs,        setPacks]        = useState<KnowledgePackWithEnabled[]>([]);
-  const [saving,       setSaving]       = useState(false);
-  const [saveMsg,      setSaveMsg]      = useState('');
 
   useEffect(() => {
-    Promise.all([
-      api.config.llm.get(),
-      api.config.pricing.list(),
-      api.repos.list(),
-    ]).then(([llm, p, r]) => {
-      setLlmConfig(llm);
-      if (llm) {
-        const isPreset = PRESET_PROVIDERS.some((p) => p.value === llm.provider);
-        setSelectedProvider(isPreset ? llm.provider : OTHER_VALUE);
-        if (!isPreset) setCustomProvider(llm.provider);
-        setBaseUrl(llm.baseUrl ?? '');
-      }
-      setPricing(p);
-      setRepos(r);
-      if (r.length > 0) setSelectedRepo(r[0].id);
-    });
+    Promise.all([api.config.llm.list(), api.config.pricing.list(), api.repos.list()])
+      .then(([cfgs, p, r]) => {
+        setLlmConfigs(cfgs);
+        setShowNewForm(cfgs.length === 0);
+        setPricing(p);
+        setRepos(r);
+        if (r.length > 0) setSelectedRepo(r[0].id);
+      });
   }, []);
 
   useEffect(() => {
@@ -62,24 +161,31 @@ export default function SettingsPage() {
     api.config.packs.forRepo(selectedRepo).then(setPacks);
   }, [selectedRepo]);
 
-  async function handleSaveLlm(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setSaving(true);
-    const form = new FormData(e.currentTarget);
-    const resolvedProvider = selectedProvider === OTHER_VALUE ? customProvider.trim() : selectedProvider;
-    try {
-      const updated = await api.config.llm.save({
-        provider: resolvedProvider,
-        model:    form.get('model') as string,
-        apiKey:   form.get('apiKey') as string,
-        baseUrl:  baseUrl.trim() || undefined,
-      });
-      setLlmConfig(updated);
-      setSaveMsg('Saved!');
-    } finally {
-      setSaving(false);
-      setTimeout(() => setSaveMsg(''), 3000);
-    }
+  async function handleActivate(id: string) {
+    const updated = await api.config.llm.activate(id);
+    setLlmConfigs((prev) => prev.map((c) => ({ ...c, active: c.id === updated.id })));
+  }
+
+  async function handleDelete(id: string) {
+    await api.config.llm.delete(id);
+    setLlmConfigs((prev) => {
+      const next = prev.filter((c) => c.id !== id);
+      // If we deleted the active one, auto-mark the last remaining as active (mirrors backend)
+      if (prev.find((c) => c.id === id)?.active && next.length > 0) {
+        next[next.length - 1] = { ...next[next.length - 1], active: true };
+      }
+      return next;
+    });
+  }
+
+  function handleCreated(cfg: LlmConfigResponse) {
+    setLlmConfigs((prev) => {
+      // If this is the first config it came back as active
+      return cfg.active
+        ? [...prev.map((c) => ({ ...c, active: false })), cfg]
+        : [...prev, cfg];
+    });
+    setShowNewForm(false);
   }
 
   async function handleTogglePack(packId: string, enabled: boolean) {
@@ -95,10 +201,10 @@ export default function SettingsPage() {
     const entry = pricing.find((p) => p.id === id);
     if (!entry) return;
     const updated = await api.config.pricing.update(id, {
-      inputPerMTok:       entry.inputPerMTok,
-      outputPerMTok:      entry.outputPerMTok,
-      cacheReadPerMTok:   entry.cacheReadPerMTok,
-      cacheWritePerMTok:  entry.cacheWritePerMTok,
+      inputPerMTok:      entry.inputPerMTok,
+      outputPerMTok:     entry.outputPerMTok,
+      cacheReadPerMTok:  entry.cacheReadPerMTok,
+      cacheWritePerMTok: entry.cacheWritePerMTok,
       [field]: parseFloat(value) || 0,
     });
     setPricing((prev) => prev.map((p) => (p.id === id ? updated : p)));
@@ -111,108 +217,66 @@ export default function SettingsPage() {
         <p className="text-sm text-gray-500 mt-1">Configure your LLM, knowledge packs, and pricing</p>
       </div>
 
-      {/* LLM Config */}
-      <Card title="LLM Configuration">
-        {llmConfig && (
-          <p className="text-sm text-gray-500 mb-4">
-            Active: <span className="font-medium text-gray-700">{llmConfig.provider} / {llmConfig.model}</span>
-            <span className="ml-2 font-mono text-gray-400">{llmConfig.keyHint}</span>
-          </p>
-        )}
-        <form onSubmit={handleSaveLlm} className="flex flex-col gap-4">
-          <Field label="Provider">
-            <div className="grid grid-cols-3 gap-3">
-              {PRESET_PROVIDERS.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => setSelectedProvider(p.value)}
-                  className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${
-                    selectedProvider === p.value
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                >
-                  <span className={selectedProvider === p.value ? 'text-blue-600' : 'text-gray-400'}>
-                    {p.logo}
-                  </span>
-                  <div>
-                    <p className={`text-sm font-semibold ${selectedProvider === p.value ? 'text-blue-700' : 'text-gray-700'}`}>
-                      {p.label}
-                    </p>
-                    <p className="text-xs text-gray-400">{p.description}</p>
-                  </div>
-                  {selectedProvider === p.value && (
-                    <span className="ml-auto w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs shrink-0">✓</span>
-                  )}
-                </button>
-              ))}
-
-              {/* Other card */}
-              <button
-                type="button"
-                onClick={() => setSelectedProvider(OTHER_VALUE)}
-                className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${
-                  selectedProvider === OTHER_VALUE
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 bg-white hover:border-gray-300'
-                }`}
+      {/* LLM Configurations */}
+      <Card title="LLM Configurations">
+        {/* Saved configs list */}
+        {llmConfigs.length > 0 && (
+          <div className="flex flex-col gap-2 mb-4">
+            {llmConfigs.map((cfg) => (
+              <div key={cfg.id}
+                className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${cfg.active ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'}`}
               >
-                <span className={`text-xl ${selectedProvider === OTHER_VALUE ? 'text-blue-600' : 'text-gray-400'}`}>⚙️</span>
-                <div>
-                  <p className={`text-sm font-semibold ${selectedProvider === OTHER_VALUE ? 'text-blue-700' : 'text-gray-700'}`}>
-                    Other
+                <div className="flex-1 min-w-0">
+                  {cfg.label && <p className="text-sm font-semibold text-gray-800 truncate">{cfg.label}</p>}
+                  <p className={`text-sm ${cfg.label ? 'text-gray-500' : 'font-semibold text-gray-800'} truncate`}>
+                    {cfg.provider} / {cfg.model}
                   </p>
-                  <p className="text-xs text-gray-400">OpenAI-compatible</p>
+                  <p className="text-xs text-gray-400 font-mono mt-0.5">{cfg.keyHint}</p>
                 </div>
-                {selectedProvider === OTHER_VALUE && (
-                  <span className="ml-auto w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs shrink-0">✓</span>
-                )}
-              </button>
-            </div>
-
-            {/* Expanded fields for custom provider */}
-            {selectedProvider === OTHER_VALUE && (
-              <div className="mt-3 flex flex-col gap-3 p-4 bg-gray-50 border border-gray-200 rounded-xl">
-                <p className="text-xs text-gray-500">
-                  Any OpenAI-compatible API works — Groq, Mistral, Together AI, Ollama, etc.
-                </p>
-                <Field label="Provider name">
-                  <input
-                    value={customProvider}
-                    onChange={(e) => setCustomProvider(e.target.value)}
-                    placeholder="groq, mistral, ollama…"
-                    className={inputCls}
-                  />
-                </Field>
-                <Field label="Base URL">
-                  <input
-                    value={baseUrl}
-                    onChange={(e) => setBaseUrl(e.target.value)}
-                    placeholder="https://api.groq.com/openai/v1"
-                    className={inputCls}
-                  />
-                </Field>
+                <div className="flex items-center gap-2 shrink-0">
+                  {cfg.active
+                    ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500 text-white">Active</span>
+                    : (
+                      <button onClick={() => handleActivate(cfg.id)}
+                        className="text-xs font-medium px-2 py-0.5 rounded-full border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors">
+                        Activate
+                      </button>
+                    )
+                  }
+                  <button
+                    onClick={() => handleDelete(cfg.id)}
+                    disabled={llmConfigs.length === 1}
+                    title={llmConfigs.length === 1 ? 'Cannot delete the only configuration' : 'Delete'}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-            )}
-          </Field>
-          <Field label="Model">
-            <input name="model" defaultValue={llmConfig?.model ?? 'claude-opus-4-8'} className={inputCls} />
-          </Field>
-          <Field label="API Key">
-            <input name="apiKey" type="password" placeholder="sk-ant-..." required className={inputCls} />
-          </Field>
-          <div className="flex items-center gap-3 pt-1">
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
-            >
-              {saving ? 'Saving…' : 'Save'}
-            </button>
-            {saveMsg && <span className="text-sm text-green-600 font-medium">{saveMsg}</span>}
+            ))}
           </div>
-        </form>
+        )}
+
+        {/* Add new button */}
+        {!showNewForm && (
+          <button onClick={() => setShowNewForm(true)}
+            className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-colors">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Add configuration
+          </button>
+        )}
+
+        {showNewForm && (
+          <NewConfigForm
+            pricing={pricing}
+            onCreated={handleCreated}
+            onCancel={() => llmConfigs.length > 0 && setShowNewForm(false)}
+          />
+        )}
       </Card>
 
       {/* Knowledge Packs */}
@@ -227,18 +291,12 @@ export default function SettingsPage() {
           </Field>
           <div className="flex flex-col gap-2">
             {packs.map((pack) => (
-              <label
-                key={pack.id}
-                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  pack.enabled ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:bg-gray-50'
-                }`}
+              <label key={pack.id}
+                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${pack.enabled ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
               >
-                <input
-                  type="checkbox"
-                  checked={pack.enabled}
+                <input type="checkbox" checked={pack.enabled}
                   onChange={(e) => handleTogglePack(pack.id, e.target.checked)}
-                  className="mt-0.5 accent-blue-600"
-                />
+                  className="mt-0.5 accent-blue-600" />
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{pack.title}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{pack.description}</p>
@@ -270,13 +328,9 @@ export default function SettingsPage() {
                     <td className="py-2 pr-4 font-mono text-xs text-gray-600">{p.model}</td>
                     {(['inputPerMTok', 'outputPerMTok', 'cacheReadPerMTok', 'cacheWritePerMTok'] as const).map((field) => (
                       <td key={field} className="py-2 pr-4">
-                        <input
-                          type="number"
-                          step="0.01"
-                          defaultValue={p[field]}
+                        <input type="number" step="0.01" defaultValue={p[field]}
                           onBlur={(e) => handleUpdatePricing(p.id, field, e.target.value)}
-                          className="w-20 px-2 py-1 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-200"
-                        />
+                          className="w-20 px-2 py-1 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-200" />
                       </td>
                     ))}
                   </tr>
@@ -285,6 +339,49 @@ export default function SettingsPage() {
             </table>
           </div>
         </Card>
+      )}
+    </div>
+  );
+}
+
+function ModelCombobox({ value, onChange, placeholder, options }: { value: string; onChange: (v: string) => void; placeholder?: string; options: string[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const filtered = options.filter((o) => o.toLowerCase().includes(value.toLowerCase()));
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative">
+        <input value={value} onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)} placeholder={placeholder ?? 'e.g. claude-opus-4-8'}
+          className={`${inputCls} pr-8`} />
+        <button type="button" onClick={() => setOpen((o) => !o)}
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+          <svg className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      </div>
+      {open && filtered.length > 0 && (
+        <ul className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+          {filtered.map((option) => (
+            <li key={option}>
+              <button type="button"
+                onMouseDown={(e) => { e.preventDefault(); onChange(option); setOpen(false); }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors ${option === value ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}>
+                {option}
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

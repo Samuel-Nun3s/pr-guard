@@ -35,13 +35,23 @@ export class GithubApiService {
     installationId: number,
   ): Promise<PullRequestFile[]> {
     const octokit = await this.getInstallationOctokit(installationId);
-    const { data } = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}/files', {
-      owner,
-      repo,
-      pull_number: pullNumber,
-      per_page: 100,
-    });
-    return data as PullRequestFile[];
+    const files: PullRequestFile[] = [];
+    let page = 1;
+
+    while (true) {
+      const { data } = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}/files', {
+        owner,
+        repo,
+        pull_number: pullNumber,
+        per_page: 100,
+        page,
+      });
+      files.push(...(data as PullRequestFile[]));
+      if (data.length < 100) break;
+      page++;
+    }
+
+    return files;
   }
 
   async postReviewComments(
@@ -52,6 +62,7 @@ export class GithubApiService {
     comments: FormattedComment[],
     summary: string,
     commitSha: string,
+    event: 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES' = 'COMMENT',
   ): Promise<void> {
     const octokit = await this.getInstallationOctokit(installationId);
 
@@ -60,7 +71,7 @@ export class GithubApiService {
       repo,
       pull_number: pullNumber,
       commit_id: commitSha,
-      event: 'COMMENT',
+      event,
       body: summary,
       comments: comments.map((c) => ({
         path: c.path,
@@ -69,7 +80,7 @@ export class GithubApiService {
       })),
     });
 
-    this.logger.log(`Posted ${comments.length} comments on ${owner}/${repo}#${pullNumber}`);
+    this.logger.log(`Posted ${comments.length} comments (${event}) on ${owner}/${repo}#${pullNumber}`);
   }
 
   async getFileContent(

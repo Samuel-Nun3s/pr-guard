@@ -7,11 +7,11 @@ const noEvents: Array<{ step: string; payload?: Record<string, unknown> }> = [];
 describe('PipelineView', () => {
   it('renders all pipeline steps', () => {
     render(<PipelineView events={noEvents} />);
-    expect(screen.getByText('Enfileirado')).toBeTruthy();
-    expect(screen.getByText('Diff carregado')).toBeTruthy();
-    expect(screen.getByText('Revisando arquivos')).toBeTruthy();
-    expect(screen.getByText('Comentários postados')).toBeTruthy();
-    expect(screen.getByText('Concluído')).toBeTruthy();
+    expect(screen.getByText('Queued')).toBeTruthy();
+    expect(screen.getByText('Diff loaded')).toBeTruthy();
+    expect(screen.getByText('Reviewing files')).toBeTruthy();
+    expect(screen.getByText('Comments posted')).toBeTruthy();
+    expect(screen.getByText('Completed')).toBeTruthy();
   });
 
   it('shows checkmarks for completed steps', () => {
@@ -21,11 +21,11 @@ describe('PipelineView', () => {
     ];
     const { container } = render(<PipelineView events={events} />);
     const checkmarks = container.querySelectorAll('li');
-    // First two steps have ✅
-    expect(checkmarks[0].textContent).toContain('✅');
-    expect(checkmarks[1].textContent).toContain('✅');
+    // First two steps have ✓
+    expect(checkmarks[0].textContent).toContain('✓');
+    expect(checkmarks[1].textContent).toContain('✓');
     // Third step is not yet done
-    expect(checkmarks[2].textContent).not.toContain('✅');
+    expect(checkmarks[2].textContent).not.toContain('✓');
   });
 
   it('shows reviewing file info when reviewing_file event is present', () => {
@@ -49,12 +49,12 @@ describe('PipelineView', () => {
     ];
     const { container } = render(<PipelineView events={events} status="COMPLETED" />);
     const checkmarks = container.querySelectorAll('li');
-    checkmarks.forEach((li) => expect(li.textContent).toContain('✅'));
+    checkmarks.forEach((li) => expect(li.textContent).toContain('✓'));
   });
 
   it('shows error indicator when status is FAILED', () => {
     const events = [{ step: 'queued' }, { step: 'diff_loaded' }];
     const { container } = render(<PipelineView events={events} status="FAILED" />);
-    expect(container.textContent).toContain('❌');
+    expect(container.textContent).toContain('✕');
   });
 });

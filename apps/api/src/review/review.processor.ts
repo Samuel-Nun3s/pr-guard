@@ -56,11 +56,12 @@ export class ReviewProcessor {
     await this.events.publish(runId, 'queued');
 
     try {
-      const [commitSha, files, llmConfig, prReviewRaw] = await Promise.all([
+      const [commitSha, files, llmConfig, prReviewRaw, repository] = await Promise.all([
         this.github.getHeadCommitSha(owner, repo, pullNumber, installationId),
         this.github.getPullRequestFiles(owner, repo, pullNumber, installationId),
-        this.prisma.llmConfig.findFirst(),
+        this.prisma.llmConfig.findFirst({ where: { active: true } }).then((c) => c ?? this.prisma.llmConfig.findFirst()),
         this.github.getFileContent(owner, repo, '.prreview.json', installationId),
+        this.prisma.repository.findUnique({ where: { id: repositoryId }, select: { reviewMode: true } }),
       ]);
 
       if (!llmConfig) throw new Error('No LLM config found. Add one via Settings.');
@@ -88,6 +89,7 @@ export class ReviewProcessor {
       const totalUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
       const allFormattedComments: Array<{ path: string; line: number; body: string }> = [];
       const summaries: string[] = [];
+      let hasBlockingIssues = false;
 
       for (let i = 0; i < diffs.length; i++) {
         const diff = diffs[i];
@@ -108,6 +110,10 @@ export class ReviewProcessor {
           this.configParser.meetsSeverityThreshold(c.severity, prReviewConfig.minSeverity),
         );
 
+        if (eligibleComments.some((c) => c.severity === 'error' || c.severity === 'warning')) {
+          hasBlockingIssues = true;
+        }
+
         if (fileReview.summary) summaries.push(`**${diff.filename}:** ${fileReview.summary}`);
 
         const formatted = this.formatter.format(diff.filename, eligibleComments, diff.addedLines);
@@ -127,12 +133,15 @@ export class ReviewProcessor {
       const overallSummary = summaries.join('\n\n') || 'No significant issues found.';
       const costCents = pricing ? this.costCalculator.calculate(totalUsage, pricing) : 0;
 
-      if (allFormattedComments.length > 0) {
-        await this.github.postReviewComments(
-          owner, repo, pullNumber, installationId,
-          allFormattedComments, overallSummary, commitSha,
-        );
-      }
+      const reviewEvent = repository?.reviewMode === 'review'
+        ? (hasBlockingIssues ? 'REQUEST_CHANGES' : 'APPROVE')
+        : 'COMMENT';
+
+      await this.github.postReviewComments(
+        owner, repo, pullNumber, installationId,
+        allFormattedComments, overallSummary, commitSha,
+        reviewEvent as 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES',
+      );
 
       await this.events.publish(runId, 'comments_posted', { count: allFormattedComments.length });
 
