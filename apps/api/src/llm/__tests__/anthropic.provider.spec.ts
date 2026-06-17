@@ -89,7 +89,7 @@ describe('AnthropicProvider', () => {
     await provider.reviewFile('d.ts', 'diff', '');
 
     const call = mockCreate.mock.calls[0][0];
-    expect(call.system[0].text).toBe('You are a senior code reviewer.');
+    expect(call.system[0].text).toContain('You are a senior code reviewer.');
   });
 
   it('passes cache_control ephemeral on the system prompt block', async () => {

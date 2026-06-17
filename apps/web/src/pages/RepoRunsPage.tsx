@@ -14,6 +14,7 @@ export default function RepoRunsPage() {
   const [runs, setRuns] = useState<Run[]>([]);
   const [repo, setRepo] = useState<RepoWithStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -27,16 +28,62 @@ export default function RepoRunsPage() {
     });
   }, [id]);
 
+  async function toggleReviewMode() {
+    if (!repo || !id || toggling) return;
+    const next = repo.reviewMode === 'review' ? 'comment' : 'review';
+    setToggling(true);
+    try {
+      await api.repos.update(id, { reviewMode: next });
+      setRepo((r) => r ? { ...r, reviewMode: next } : r);
+    } finally {
+      setToggling(false);
+    }
+  }
+
   const repoName = repo ? `${repo.owner}/${repo.name}` : 'Repository';
+  const isReviewMode = repo?.reviewMode === 'review';
 
   return (
     <div className="max-w-4xl mx-auto w-full">
-      <div className="mb-6">
-        <Link to="/" className="text-sm text-gray-400 hover:text-gray-600 mb-2 inline-block">
-          ← Repositories
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-900">{repoName}</h1>
-        <p className="text-sm text-gray-500 mt-1">All review runs for this repository</p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <Link to="/" className="text-sm text-gray-400 hover:text-gray-600 mb-2 inline-block">
+            ← Repositories
+          </Link>
+          <h1 className="text-2xl font-bold text-gray-900">{repoName}</h1>
+          <p className="text-sm text-gray-500 mt-1">All review runs for this repository</p>
+        </div>
+
+        {repo && (
+          <div className="shrink-0 bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-2 min-w-[220px]">
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Review mode</span>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  {isReviewMode ? 'Approve / Request changes' : 'Comment only'}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {isReviewMode
+                    ? 'Agent approves or blocks the PR'
+                    : 'Agent posts comments without voting'}
+                </p>
+              </div>
+              <button
+                onClick={toggleReviewMode}
+                disabled={toggling}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                  isReviewMode ? 'bg-blue-600' : 'bg-gray-200'
+                } ${toggling ? 'opacity-50' : ''}`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+                    isReviewMode ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {loading ? (

@@ -40,7 +40,6 @@ function NewConfigForm({
   const [selectedProvider, setSelectedProvider] = useState('anthropic');
   const [customProvider, setCustomProvider] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
-  const [reviewMode, setReviewMode] = useState<'comment' | 'review'>('comment');
   const [model, setModel] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -51,12 +50,11 @@ function NewConfigForm({
     const resolvedProvider = selectedProvider === OTHER_VALUE ? customProvider.trim() : selectedProvider;
     try {
       const created = await api.config.llm.create({
-        label:      (form.get('label') as string).trim(),
-        provider:   resolvedProvider,
-        model:      model.trim() || (form.get('model') as string),
-        apiKey:     form.get('apiKey') as string,
-        baseUrl:    baseUrl.trim() || undefined,
-        reviewMode,
+        label:    (form.get('label') as string).trim(),
+        provider: resolvedProvider,
+        model:    model.trim() || (form.get('model') as string),
+        apiKey:   form.get('apiKey') as string,
+        baseUrl:  baseUrl.trim() || undefined,
       });
       onCreated(created);
     } finally {
@@ -122,24 +120,6 @@ function NewConfigForm({
 
       <Field label="API Key">
         <input name="apiKey" type="password" placeholder="sk-ant-…" required className={inputCls} />
-      </Field>
-
-      <Field label="Review behavior">
-        <div className="grid grid-cols-2 gap-3 mt-1">
-          {(['comment', 'review'] as const).map((mode) => (
-            <button key={mode} type="button" onClick={() => setReviewMode(mode)}
-              className={`flex flex-col gap-1 p-3 rounded-xl border-2 text-left transition-all ${reviewMode === mode ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
-            >
-              <span className="text-lg">{mode === 'comment' ? '💬' : '✅'}</span>
-              <p className={`text-sm font-semibold ${reviewMode === mode ? 'text-blue-700' : 'text-gray-700'}`}>
-                {mode === 'comment' ? 'Comment only' : 'Full review'}
-              </p>
-              <p className="text-xs text-gray-400">
-                {mode === 'comment' ? 'Posts comments without approving or blocking the PR' : 'Approves clean PRs, requests changes on errors/warnings'}
-              </p>
-            </button>
-          ))}
-        </div>
       </Field>
 
       <div className="flex items-center gap-3">

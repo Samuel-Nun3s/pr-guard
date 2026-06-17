@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../llm/crypto.service';
 import { AuthGuard } from '../auth/auth.guard';
 
-const LLM_SELECT = { id: true, label: true, provider: true, model: true, baseUrl: true, reviewMode: true, active: true, createdAt: true, updatedAt: true } as const;
+const LLM_SELECT = { id: true, label: true, provider: true, model: true, baseUrl: true, active: true, createdAt: true, updatedAt: true } as const;
 
 @UseGuards(AuthGuard)
 @Controller('config')
@@ -30,17 +30,16 @@ export class ConfigController {
   @Post('llm')
   @HttpCode(200)
   async createLlmConfig(
-    @Body() body: { label?: string; provider: string; model: string; apiKey: string; baseUrl?: string; reviewMode?: string },
+    @Body() body: { label?: string; provider: string; model: string; apiKey: string; baseUrl?: string },
   ) {
     const encryptedKey = this.crypto.encrypt(body.apiKey);
     const baseUrl = body.baseUrl?.trim() || null;
-    const reviewMode = body.reviewMode === 'review' ? 'review' : 'comment';
     const label = body.label?.trim() || '';
 
     const hasActive = await this.prisma.llmConfig.count({ where: { active: true } });
 
     return this.prisma.llmConfig.create({
-      data: { label, provider: body.provider, model: body.model, encryptedKey, baseUrl, reviewMode, active: hasActive === 0 },
+      data: { label, provider: body.provider, model: body.model, encryptedKey, baseUrl, active: hasActive === 0 },
       select: LLM_SELECT,
     });
   }
@@ -48,22 +47,20 @@ export class ConfigController {
   @Put('llm/:id')
   async updateLlmConfig(
     @Param('id') id: string,
-    @Body() body: { label?: string; provider?: string; model?: string; apiKey?: string; baseUrl?: string; reviewMode?: string },
+    @Body() body: { label?: string; provider?: string; model?: string; apiKey?: string; baseUrl?: string },
   ) {
     const existing = await this.prisma.llmConfig.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException();
 
     const encryptedKey = body.apiKey ? this.crypto.encrypt(body.apiKey) : existing.encryptedKey;
-    const reviewMode = body.reviewMode === 'review' ? 'review' : body.reviewMode === 'comment' ? 'comment' : existing.reviewMode;
 
     return this.prisma.llmConfig.update({
       where: { id },
       data: {
-        label:        body.label?.trim() ?? existing.label,
-        provider:     body.provider     ?? existing.provider,
-        model:        body.model        ?? existing.model,
-        baseUrl:      'baseUrl' in body ? (body.baseUrl?.trim() || null) : existing.baseUrl,
-        reviewMode,
+        label:    body.label?.trim() ?? existing.label,
+        provider: body.provider     ?? existing.provider,
+        model:    body.model        ?? existing.model,
+        baseUrl:  'baseUrl' in body ? (body.baseUrl?.trim() || null) : existing.baseUrl,
         encryptedKey,
       },
       select: LLM_SELECT,

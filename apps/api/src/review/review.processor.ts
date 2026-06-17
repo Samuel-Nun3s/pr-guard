@@ -56,11 +56,12 @@ export class ReviewProcessor {
     await this.events.publish(runId, 'queued');
 
     try {
-      const [commitSha, files, llmConfig, prReviewRaw] = await Promise.all([
+      const [commitSha, files, llmConfig, prReviewRaw, repository] = await Promise.all([
         this.github.getHeadCommitSha(owner, repo, pullNumber, installationId),
         this.github.getPullRequestFiles(owner, repo, pullNumber, installationId),
         this.prisma.llmConfig.findFirst({ where: { active: true } }).then((c) => c ?? this.prisma.llmConfig.findFirst()),
         this.github.getFileContent(owner, repo, '.prreview.json', installationId),
+        this.prisma.repository.findUnique({ where: { id: repositoryId }, select: { reviewMode: true } }),
       ]);
 
       if (!llmConfig) throw new Error('No LLM config found. Add one via Settings.');
@@ -132,7 +133,7 @@ export class ReviewProcessor {
       const overallSummary = summaries.join('\n\n') || 'No significant issues found.';
       const costCents = pricing ? this.costCalculator.calculate(totalUsage, pricing) : 0;
 
-      const reviewEvent = llmConfig.reviewMode === 'review'
+      const reviewEvent = repository?.reviewMode === 'review'
         ? (hasBlockingIssues ? 'REQUEST_CHANGES' : 'APPROVE')
         : 'COMMENT';
 

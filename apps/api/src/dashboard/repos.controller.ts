@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Body, UseGuards } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthGuard } from '../auth/auth.guard';
 
@@ -28,12 +28,21 @@ export class ReposController {
     return withStats;
   }
 
+  @Patch(':id')
+  updateRepo(
+    @Param('id') id: string,
+    @Body() body: { reviewMode?: string },
+  ) {
+    const reviewMode = body.reviewMode === 'review' ? 'review' : 'comment';
+    return this.prisma.repository.update({ where: { id }, data: { reviewMode } });
+  }
+
   @Get(':id/runs')
   getRepoRuns(@Param('id') id: string) {
     return this.prisma.reviewRun.findMany({
       where: { repositoryId: id },
       orderBy: { createdAt: 'desc' },
-      take: 20,
+      take: 50,
     });
   }
 }

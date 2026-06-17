@@ -35,8 +35,8 @@ export class AnthropicProvider implements LlmProvider {
 
   async reviewFile(filename: string, diff: string, packs: string): Promise<FileReview> {
     const systemText = packs
-      ? `You are a senior code reviewer.\n\n${packs}`
-      : 'You are a senior code reviewer.';
+      ? `You are a senior code reviewer. Be concise: each comment body must be 1–2 sentences max. Flag only real issues — skip style nitpicks unless they cause bugs.\n\n${packs}`
+      : 'You are a senior code reviewer. Be concise: each comment body must be 1–2 sentences max. Flag only real issues — skip style nitpicks unless they cause bugs.';
 
     const response = await (this.client.messages.create as Function)({
       model: this.model,
